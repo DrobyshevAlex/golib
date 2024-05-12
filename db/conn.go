@@ -48,3 +48,20 @@ func (c Conn) Query(ctx context.Context, sql string, args ...interface{}) (*Rows
 func (c Conn) QueryRow(ctx context.Context, sql string, args ...interface{}) Row {
 	return Row{row: c.Pool.QueryRow(ctx, sql, args...)}
 }
+
+func (c Conn) Atomic(ctx context.Context, atomicFunc func(ctx context.Context) error) (err error) {
+	tx, err := c.Begin(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback(ctx)
+		} else {
+			err = tx.Commit(ctx)
+		}
+	}()
+
+	return atomicFunc(With(ctx, tx))
+}
